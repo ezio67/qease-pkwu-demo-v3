@@ -37,19 +37,19 @@ export const nearbyBusinesses: NearbyBusiness[] = [
 ]
 
 const barberServices: Service[] = [
-  { id: 'haircut', name: 'Haircut', description: 'A clean cut, shaped to suit you.', duration: 30, price: 35000, active: true, icon: 'scissors' },
-  { id: 'haircut-wash', name: 'Haircut + Wash', description: 'A fresh cut with a relaxing wash.', duration: 45, price: 50000, active: true, icon: 'droplets' },
-  { id: 'haircut-beard', name: 'Haircut + Beard', description: 'A sharp cut and beard tidy-up.', duration: 40, price: 55000, active: true, icon: 'sparkles' },
+  { id: 'haircut', name: 'Haircut', description: 'A clean cut, shaped to suit you.', duration: 30, price: 35000, variableCost: 5000, active: true, icon: 'scissors' },
+  { id: 'haircut-wash', name: 'Haircut + Wash', description: 'A fresh cut with a relaxing wash.', duration: 45, price: 50000, variableCost: 11000, active: true, icon: 'droplets' },
+  { id: 'haircut-beard', name: 'Haircut + Beard', description: 'A sharp cut and beard tidy-up.', duration: 40, price: 55000, variableCost: 8000, active: true, icon: 'sparkles' },
 ]
 
 const carWashServices: Service[] = [
-  { id: 'express-wash', name: 'Express Wash', description: 'A quick exterior clean while you get on with your day.', duration: 25, price: 45000, active: true, icon: 'car' },
-  { id: 'wash-vacuum', name: 'Wash + Vacuum', description: 'A thorough wash with an interior refresh.', duration: 40, price: 65000, active: true, icon: 'wind' },
-  { id: 'premium-detail', name: 'Premium Detail', description: 'A careful detail for a bright, polished finish.', duration: 60, price: 120000, active: true, icon: 'spray' },
+  { id: 'express-wash', name: 'Express Wash', description: 'A quick exterior clean while you get on with your day.', duration: 25, price: 45000, variableCost: 12000, active: true, icon: 'car' },
+  { id: 'wash-vacuum', name: 'Wash + Vacuum', description: 'A thorough wash with an interior refresh.', duration: 40, price: 65000, variableCost: 19000, active: true, icon: 'wind' },
+  { id: 'premium-detail', name: 'Premium Detail', description: 'A careful detail for a bright, polished finish.', duration: 60, price: 120000, variableCost: 42000, active: true, icon: 'spray' },
 ]
 
 const barberTickets = (): Ticket[] => [
-  { id: 'A22', customerName: 'Miko', phone: '0812 0000 0022', serviceId: 'haircut', joinedAt: minutesAgo(126), status: 'completed', availability: 'here', serviceStartedAt: minutesAgo(96), completedAt: minutesAgo(66), paymentMethod: 'card', paymentStatus: 'paid', paymentConfirmedAt: minutesAgo(66), feedback: { rating: 5, returnHelpful: true, comment: 'The Return Window was accurate, so I could finish my coffee nearby.', submittedAt: minutesAgo(61) } },
+  { id: 'A22', customerName: 'Miko', phone: '0812 0000 0022', serviceId: 'haircut', serviceNameSnapshot: 'Haircut', servicePriceSnapshot: 35000, serviceCostSnapshot: 5000, joinedAt: minutesAgo(126), status: 'completed', availability: 'here', serviceStartedAt: minutesAgo(96), completedAt: minutesAgo(66), paymentMethod: 'card', paymentStatus: 'paid', paymentConfirmedAt: minutesAgo(66), paymentRecord: { method: 'card', amount: 35000, recordedAt: minutesAgo(66), recordedBy: 'Front desk' }, feedback: { rating: 5, returnHelpful: true, comment: 'The Return Window was accurate, so I could finish my coffee nearby.', submittedAt: minutesAgo(61) } },
   { id: 'A23', customerName: 'Arif', phone: '0812 0000 0023', serviceId: 'haircut', joinedAt: minutesAgo(75), status: 'in-service', availability: 'here', assignedStaffId: 'dimas', serviceStartedAt: minutesAgo(12) },
   { id: 'A24', customerName: 'Naya', phone: '0812 0000 0024', serviceId: 'haircut-wash', joinedAt: minutesAgo(64), status: 'called', availability: 'here', calledAt: minutesAgo(3) },
   { id: 'A25', customerName: 'Bimo', phone: '0812 0000 0025', serviceId: 'haircut', joinedAt: minutesAgo(52), status: 'return-soon', availability: 'on-the-way' },
@@ -60,7 +60,7 @@ const barberTickets = (): Ticket[] => [
 ]
 
 const carWashTickets = (): Ticket[] => [
-  { id: 'W11', customerName: 'Sari', phone: '0813 0000 0011', serviceId: 'express-wash', joinedAt: minutesAgo(105), status: 'completed', availability: 'here', serviceStartedAt: minutesAgo(80), completedAt: minutesAgo(55), paymentMethod: 'cash', paymentStatus: 'paid', paymentConfirmedAt: minutesAgo(55), feedback: { rating: 4, returnHelpful: true, comment: 'Easy to join and I did not need to wait in the parking lot.', submittedAt: minutesAgo(49) } },
+  { id: 'W11', customerName: 'Sari', phone: '0813 0000 0011', serviceId: 'express-wash', serviceNameSnapshot: 'Express Wash', servicePriceSnapshot: 45000, serviceCostSnapshot: 12000, joinedAt: minutesAgo(105), status: 'completed', availability: 'here', serviceStartedAt: minutesAgo(80), completedAt: minutesAgo(55), paymentMethod: 'cash', paymentStatus: 'paid', paymentConfirmedAt: minutesAgo(55), paymentRecord: { method: 'cash', amount: 45000, recordedAt: minutesAgo(55), recordedBy: 'Front desk' }, feedback: { rating: 4, returnHelpful: true, comment: 'Easy to join and I did not need to wait in the parking lot.', submittedAt: minutesAgo(49) } },
   { id: 'W12', customerName: 'Amir', phone: '0813 0000 0012', serviceId: 'express-wash', joinedAt: minutesAgo(58), status: 'in-service', availability: 'here', assignedStaffId: 'rizky', serviceStartedAt: minutesAgo(10) },
   { id: 'W13', customerName: 'Kezia', phone: '0813 0000 0013', serviceId: 'wash-vacuum', joinedAt: minutesAgo(45), status: 'return-soon', availability: 'on-the-way' },
   { id: 'W14', customerName: 'Daniel', phone: '0813 0000 0014', serviceId: 'premium-detail', joinedAt: minutesAgo(28), status: 'waiting', availability: null },
@@ -99,7 +99,7 @@ export function createSeedState(slug: BusinessSlug = 'barber-kawan'): QueueState
         slug, kind: 'car-wash', name: 'Kilap Car Wash', category: 'Car care', location: 'Jl. Kemang Raya, Jakarta', distance: '0.9 km · 3 min drive', phone: '+62 813 7777 2300',
         description: 'A cleaner car, without waiting in the parking lot. Join the wash queue and come back when your bay is ready.', accentColor: '#147d9a', latitude: -6.2588, longitude: 106.8224, checkInRadius: 140, targetWaitMinutes: 25, queuePrefix: 'W', queueStatus: 'open', maxQueueSize: 16,
         noShowGraceMinutes: 10, allowRejoin: true, allowWalkIns: true, allowLeave: true, returnWindowLead: 5, returnSoonThreshold: 2,
-        browserAlerts: true, returnSoonAlerts: true, turnAlerts: true, etaAlerts: true, closedToday: false, openDays: 'Every day', openingTime: '08:00', closingTime: '19:00', breakHours: '—', staffPin: '5678', subscriptionPlan: 'starter', subscriptionStatus: 'trial', customerQrisReady: false, customerCardReady: true, callSoundEnabled: true,
+        browserAlerts: true, returnSoonAlerts: true, turnAlerts: true, etaAlerts: true, closedToday: false, openDays: 'Every day', openingTime: '08:00', closingTime: '19:00', breakHours: '—', staffPin: '5678', subscriptionPlan: 'starter', subscriptionStatus: 'trial', customerQrisReady: false, customerCardReady: true, callSoundEnabled: true, monthlyFixedCosts: 1800000, operatingDaysPerMonth: 26,
       },
       services: carWashServices.map((service) => ({ ...service })),
       staff: [
@@ -116,7 +116,7 @@ export function createSeedState(slug: BusinessSlug = 'barber-kawan'): QueueState
       slug, kind: 'barber', name: 'Barber Kawan', category: 'Barbershop', location: 'Kemang, Jakarta', distance: '0.4 km · 5 min walk', phone: '+62 812 8888 2048',
       description: 'Fresh cuts, no physical waiting. Scan, join, and come back when it’s nearly your turn.', accentColor: '#0f766e', latitude: -6.2619, longitude: 106.8169, checkInRadius: 120, targetWaitMinutes: 20, queuePrefix: 'A', queueStatus: 'open', maxQueueSize: 18,
       noShowGraceMinutes: 10, allowRejoin: true, allowWalkIns: true, allowLeave: true, returnWindowLead: 5, returnSoonThreshold: 2,
-      browserAlerts: true, returnSoonAlerts: true, turnAlerts: true, etaAlerts: true, closedToday: false, openDays: 'Every day', openingTime: '09:00', closingTime: '20:00', breakHours: '—', staffPin: '1234', subscriptionPlan: 'starter', subscriptionStatus: 'trial', customerQrisReady: false, customerCardReady: true, callSoundEnabled: true,
+      browserAlerts: true, returnSoonAlerts: true, turnAlerts: true, etaAlerts: true, closedToday: false, openDays: 'Every day', openingTime: '09:00', closingTime: '20:00', breakHours: '—', staffPin: '1234', subscriptionPlan: 'starter', subscriptionStatus: 'trial', customerQrisReady: false, customerCardReady: true, callSoundEnabled: true, monthlyFixedCosts: 2400000, operatingDaysPerMonth: 26,
     },
     services: barberServices.map((service) => ({ ...service })),
     staff: [

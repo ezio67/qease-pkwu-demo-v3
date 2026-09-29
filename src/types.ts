@@ -17,9 +17,10 @@ export type QueueStatus = 'open' | 'paused' | 'closed'
 export type ServiceIconName = 'scissors' | 'sparkles' | 'droplets' | 'car' | 'wind' | 'spray'
 export type BusinessKind = 'barber' | 'car-wash'
 export type PaymentMethod = 'cash' | 'card' | 'qris' | 'e-wallet' | 'pay-at-counter'
-export type PaymentStatus = 'not-requested' | 'due-at-counter' | 'pending' | 'paid'
+export type PaymentStatus = 'not-requested' | 'due-at-counter' | 'pending' | 'paid' | 'waived'
 export type SubscriptionPlan = 'starter' | 'pro' | 'business'
 export type SubscriptionStatus = 'trial' | 'payment-pending' | 'demo-active'
+export type FeatureKey = 'analytics' | 'feedback' | 'public-display' | 'customer-alerts' | 'payments' | 'profit'
 
 export interface Service {
   id: string
@@ -27,6 +28,8 @@ export interface Service {
   description: string
   duration: number
   price: number
+  /** A staff-entered operating estimate, not a customer-facing price. */
+  variableCost: number
   active: boolean
   icon: ServiceIconName
   image?: string
@@ -49,6 +52,13 @@ export interface Feedback {
   submittedAt: string
 }
 
+export interface PaymentRecord {
+  method: Exclude<PaymentMethod, 'pay-at-counter'>
+  amount: number
+  recordedAt: string
+  recordedBy: string
+}
+
 export interface Ticket {
   id: string
   customerName: string
@@ -69,6 +79,11 @@ export interface Ticket {
   paymentMethod?: PaymentMethod
   paymentStatus?: PaymentStatus
   paymentConfirmedAt?: string
+  paymentRecord?: PaymentRecord
+  /** Immutable values used for receipts and reports even after a service menu changes. */
+  serviceNameSnapshot?: string
+  servicePriceSnapshot?: number
+  serviceCostSnapshot?: number
 }
 
 export interface BusinessSettings {
@@ -109,8 +124,12 @@ export interface BusinessSettings {
   subscriptionPlan: SubscriptionPlan
   subscriptionStatus: SubscriptionStatus
   customerQrisReady: boolean
+  /** This business's own counter QRIS image. Never used for QEase subscriptions. */
+  customerQrisImage?: string
   customerCardReady: boolean
   callSoundEnabled: boolean
+  monthlyFixedCosts: number
+  operatingDaysPerMonth: number
 }
 
 export interface ServiceStat {

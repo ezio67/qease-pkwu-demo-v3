@@ -16,7 +16,9 @@ import type {
   Ticket,
   TicketStatus,
   PaymentMethod,
+  PaymentRecord,
 } from './types'
+import { activeStaffLimit } from './entitlements'
 
 const STORAGE_KEY = 'qease-local-demo-v2'
 const LEGACY_STORAGE_KEY = 'queueless-barber-kawan-v1'
@@ -35,7 +37,7 @@ export type JoinInput = { name: string; phone: string; serviceId: string; note?:
 
 function createAppState(): DemoAppState {
   return {
-    version: 2,
+    version: 4,
     businesses: {
       'barber-kawan': createSeedState('barber-kawan'),
       'kilap-car-wash': createSeedState('kilap-car-wash'),
@@ -44,14 +46,47 @@ function createAppState(): DemoAppState {
   }
 }
 
-function mergeBusinessState(seed: QueueState, incoming: Partial<QueueState>): QueueState {
+function mergeBusinessState(seed: QueueState, incoming: Partial<QueueState>, restoreSeededCosts = false): QueueState {
+  const services = Array.isArray(incoming.services)
+    ? incoming.services.map((service) => {
+      const seededService = seed.services.find((item) => item.id === service.id)
+      const savedCost = Math.max(0, Number(service.variableCost) || 0)
+      // Version 3 did not yet expose service costs. Preserve a deliberate zero from
+      // newer data, but restore the sensible seeded estimate for legacy records.
+      const variableCost = restoreSeededCosts && savedCost === 0 && seededService?.variableCost
+        ? seededService.variableCost
+        : Math.max(0, Number(service.variableCost ?? seededService?.variableCost) || 0)
+      return { ...service, variableCost }
+    })
+    : seed.services
+  const tickets = Array.isArray(incoming.tickets)
+    ? incoming.tickets.map((ticket) => {
+      const service = services.find((item) => item.id === ticket.serviceId) ?? seed.services.find((item) => item.id === ticket.serviceId)
+      const amount = Math.max(0, Number(ticket.servicePriceSnapshot ?? service?.price) || 0)
+      const savedCost = Math.max(0, Number(ticket.serviceCostSnapshot) || 0)
+      const cost = restoreSeededCosts && savedCost === 0 && service?.variableCost
+        ? service.variableCost
+        : Math.max(0, Number(ticket.serviceCostSnapshot ?? service?.variableCost) || 0)
+      const paid = ticket.paymentStatus === 'paid'
+      return {
+        ...ticket,
+        paymentStatus: ticket.paymentStatus ?? 'due-at-counter',
+        serviceNameSnapshot: ticket.serviceNameSnapshot ?? service?.name ?? 'Service',
+        servicePriceSnapshot: amount,
+        serviceCostSnapshot: cost,
+        paymentRecord: paid && !ticket.paymentRecord && ticket.paymentMethod && ticket.paymentMethod !== 'pay-at-counter'
+          ? { method: ticket.paymentMethod, amount, recordedAt: ticket.paymentConfirmedAt ?? ticket.completedAt ?? ticket.joinedAt, recordedBy: 'Front desk' }
+          : ticket.paymentRecord,
+      }
+    })
+    : seed.tickets
   return {
     ...seed,
     ...incoming,
     business: { ...seed.business, ...(incoming.business ?? {}) },
-    services: Array.isArray(incoming.services) ? incoming.services : seed.services,
+    services,
     staff: Array.isArray(incoming.staff) ? incoming.staff : seed.staff,
-    tickets: Array.isArray(incoming.tickets) ? incoming.tickets : seed.tickets,
+    tickets,
     analytics: { ...seed.analytics, ...(incoming.analytics ?? {}) },
   }
 }
@@ -63,12 +98,14 @@ function safeAppState(): DemoAppState {
     if (saved) {
       const parsed = JSON.parse(saved) as Partial<DemoAppState>
       if (parsed.businesses) {
+        const restoreSeededCosts = (parsed.version ?? 0) < defaults.version
         return {
           ...defaults,
           ...parsed,
+          version: defaults.version,
           businesses: {
-            'barber-kawan': mergeBusinessState(defaults.businesses['barber-kawan'], parsed.businesses['barber-kawan'] ?? {}),
-            'kilap-car-wash': mergeBusinessState(defaults.businesses['kilap-car-wash'], parsed.businesses['kilap-car-wash'] ?? {}),
+            'barber-kawan': mergeBusinessState(defaults.businesses['barber-kawan'], parsed.businesses['barber-kawan'] ?? {}, restoreSeededCosts),
+            'kilap-car-wash': mergeBusinessState(defaults.businesses['kilap-car-wash'], parsed.businesses['kilap-car-wash'] ?? {}, restoreSeededCosts),
           },
           staffSessions: parsed.staffSessions ?? {},
         }
@@ -119,6 +156,26 @@ function hasActiveAssignment(state: QueueState, staffId: string) {
 
 export function availableStaffForNewService(state: QueueState) {
   return state.staff.filter((staff) => staff.activeToday && staff.status === 'available' && !staff.assignedTicketId && !hasActiveAssignment(state, staff.id))
+}
+
+export function ticketAmount(state: QueueState, ticket: Ticket) {
+  return Math.max(0, Number(ticket.servicePriceSnapshot ?? serviceFor(state, ticket.serviceId)?.price) || 0)
+}
+
+export function ticketCost(state: QueueState, ticket: Ticket) {
+  return Math.max(0, Number(ticket.serviceCostSnapshot ?? serviceFor(state, ticket.serviceId)?.variableCost) || 0)
+}
+
+export function financialSummary(state: QueueState) {
+  const paid = state.tickets.filter((ticket) => ticket.paymentStatus === 'paid')
+  const revenue = paid.reduce((total, ticket) => total + (ticket.paymentRecord?.amount ?? ticketAmount(state, ticket)), 0)
+  const variableCosts = paid.reduce((total, ticket) => total + ticketCost(state, ticket), 0)
+  const outstanding = state.tickets
+    .filter((ticket) => ['called', 'in-service', 'completed'].includes(ticket.status) && !['paid', 'waived'].includes(ticket.paymentStatus ?? 'due-at-counter'))
+    .reduce((total, ticket) => total + ticketAmount(state, ticket), 0)
+  const grossProfit = revenue - variableCosts
+  const dailyFixedCost = Math.round(Math.max(0, state.business.monthlyFixedCosts) / Math.max(1, state.business.operatingDaysPerMonth))
+  return { revenue, variableCosts, outstanding, grossProfit, dailyFixedCost, netProfit: grossProfit - dailyFixedCost, paidCount: paid.length }
 }
 
 export function calculateEstimate(state: QueueState, ticket: Ticket): Estimate {
@@ -346,6 +403,12 @@ export function QueueProvider({ children }: { children: ReactNode }) {
         if (!didChange) return previousApp
         const nextApp = { ...previousApp, businesses }
         persist(nextApp)
+        channelRef.current?.postMessage(nextApp)
+        if (hasLiveSharedQueue) {
+          for (const slug of LIVE_BUSINESS_SLUGS) {
+            if (businesses[slug] !== previousApp.businesses[slug]) void writeSharedQueue(slug, businesses[slug])
+          }
+        }
         return nextApp
       })
     }
@@ -425,7 +488,10 @@ export function useQueue(requestedSlug?: string) {
       manual: input.manual,
       browserAlerts: Boolean(input.browserAlerts),
       paymentMethod: input.paymentMethod ?? 'pay-at-counter',
-      paymentStatus: input.paymentMethod && input.paymentMethod !== 'pay-at-counter' ? 'due-at-counter' : 'due-at-counter',
+      paymentStatus: 'due-at-counter',
+      serviceNameSnapshot: service.name,
+      servicePriceSnapshot: service.price,
+      serviceCostSnapshot: service.variableCost,
       updateNote: 'You are in the queue. We’ll keep this page up to date.',
     }
     update((previous) => {
@@ -534,11 +600,12 @@ export function useQueue(requestedSlug?: string) {
       return { ...previous, tickets: previous.tickets.map((ticket) => ticket.id === next.id ? { ...ticket, status: 'return-soon', updateNote: 'Your turn is getting close — please plan your return.' } : ticket) }
     }, true),
     setQueueStatus: (status: QueueStatus) => update((previous) => ({ ...previous, business: { ...previous.business, queueStatus: status } }), true),
-    updateService: (service: Service) => update((previous) => ({ ...previous, services: previous.services.some((item) => item.id === service.id) ? previous.services.map((item) => item.id === service.id ? service : item) : [...previous.services, service] }), true),
+    updateService: (service: Service) => update((previous) => ({ ...previous, services: previous.services.some((item) => item.id === service.id) ? previous.services.map((item) => item.id === service.id ? { ...service, variableCost: Math.max(0, Number(service.variableCost) || 0) } : item) : [...previous.services, { ...service, variableCost: Math.max(0, Number(service.variableCost) || 0) }] }), true),
     toggleService: (serviceId: string) => update((previous) => ({ ...previous, services: previous.services.map((service) => service.id === serviceId ? { ...service, active: !service.active } : service) }), true),
     updateStaff: (staff: StaffMember) => update((previous) => {
       const current = previous.staff.find((entry) => entry.id === staff.id)
       if (current && hasActiveAssignment(previous, staff.id) && (!staff.activeToday || ['break', 'off'].includes(staff.status))) return previous
+      if (!current && previous.staff.length >= activeStaffLimit(previous.business.subscriptionPlan, previous.business.subscriptionStatus)) return previous
       return { ...previous, staff: current ? previous.staff.map((entry) => entry.id === staff.id ? { ...staff, assignedTicketId: current.assignedTicketId } : entry) : [...previous.staff, staff] }
     }, true),
     setStaffStatus: (staffId: string, status: StaffStatus) => update((previous) => {
@@ -546,7 +613,7 @@ export function useQueue(requestedSlug?: string) {
       return { ...previous, staff: previous.staff.map((staff) => staff.id === staffId ? { ...staff, status, activeToday: status !== 'off' } : staff) }
     }, true),
     saveBusiness: (patch: Partial<BusinessSettings>) => update((previous) => ({ ...previous, business: { ...previous.business, ...patch, slug: previous.business.slug, kind: previous.business.kind } }), true),
-    confirmPayment: (ticketId: string) => update((previous) => ({ ...previous, tickets: previous.tickets.map((ticket) => ticket.id === ticketId ? { ...ticket, paymentStatus: 'paid', paymentConfirmedAt: now() } : ticket) }), true),
+    recordPayment: (ticketId: string, record: Omit<PaymentRecord, 'recordedAt'>) => update((previous) => ({ ...previous, tickets: previous.tickets.map((ticket) => ticket.id === ticketId ? { ...ticket, paymentMethod: record.method, paymentStatus: 'paid', paymentConfirmedAt: now(), paymentRecord: { ...record, amount: Math.max(0, Number(record.amount) || ticketAmount(previous, ticket)), recordedAt: now() }, updateNote: `Payment of ${formatRupiah(Math.max(0, Number(record.amount) || ticketAmount(previous, ticket)))} was recorded by the business.` } : ticket) }), true),
     submitFeedback: (ticketId: string, feedback: Feedback) => update((previous) => {
       const target = previous.tickets.find((ticket) => ticket.id === ticketId)
       const previousRating = target?.feedback?.rating
